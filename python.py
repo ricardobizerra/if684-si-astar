@@ -1,29 +1,4 @@
-import pandas
-
-real_dist = pandas.read_csv("Distancias_Reais.csv", keep_default_na=False, index_col=0)
-direct_dist = pandas.read_csv("Distancias_Diretas.csv", keep_default_na=False, index_col=0)
-
-real = "Real"
-direta = "Direta"
-train_velocity = 30
-change_line_time = 4
-
-station_line_connections = {
-    1: [(2, 'blue')],
-    2: [(1, 'blue'), (10, 'yellow'), (9, 'yellow'), (3, 'blue')],
-    3: [(2, 'blue'), (4, 'blue'), (9, 'red'), (13, 'red')],
-    4: [(3, 'blue'), (5, 'blue'), (8, 'green'), (13, 'green')],
-    5: [(4, 'blue'), (6, 'blue'), (7, 'yellow'), (8, 'yellow')],
-    6: [(5, 'blue')],
-    7: [(5, 'yellow')],
-    8: [(4, 'green'), (5, 'yellow'), (9, 'yellow'), (12, 'green')],
-    9: [(2, 'yellow'), (3, 'red'), (8, 'yellow'), (11, 'red')],
-    10: [(2, 'yellow')],
-    11: [(9, 'red')],
-    12: [(8, 'green')],
-    13: [(3, 'red'), (4, 'green'), (14, 'green')],
-    14: [(13, 'green')]
-}
+from constraints import REAL, DIRETA, TRAIN_VELOCITY, CHANGE_LINE_TIME, LOWEST_STATION_NUMBER, HIGHEST_STATION_NUMBER, STATION_LINES, REAL_DISTANCES_CSV, DIRECT_DISTANCES_CSV, STATION_LINE_CONNECTIONS
 
 class Node:
     def __init__(self, state: tuple[int, str], parent: 'Node', cost: int, real_cost: int = 0):
@@ -37,16 +12,16 @@ def pegar_planilha(lista, E1, E2):
     E.sort()
 
     if lista == "Direta":
-        if direct_dist.iloc[E[0], E[1]] == "-":
+        if DIRECT_DISTANCES_CSV.iloc[E[0], E[1]] == "-":
             return 0.0
-        return float(direct_dist.iloc[E[0], E[1]])
+        return float(DIRECT_DISTANCES_CSV.iloc[E[0], E[1]])
     elif lista == "Real":
         try:
-            return float(real_dist.iloc[E[0], E[1]])
+            return float(REAL_DISTANCES_CSV.iloc[E[0], E[1]])
         except:
             return -1
         
-def get_time_by_distance(distance: int): return distance / train_velocity * 60
+def get_time_by_distance(distance: int): return distance / TRAIN_VELOCITY * 60
 
 def print_frontier_nodes(index: int, frontier: list[Node], nodes_that_were_first: list[tuple[int, str]] = []):
     message = f'Fronteira {index}:'
@@ -55,7 +30,6 @@ def print_frontier_nodes(index: int, frontier: list[Node], nodes_that_were_first
             message += f'\n{node.state}: {node.cost}'
     print('==============================')
     print(message)
-    print('==============================')
 
 def state_analysis(
     start: tuple[int, str], 
@@ -69,11 +43,11 @@ def state_analysis(
     node_to_analyse = latest_frontier[0]
 
     new_frontier = []
-    for connection in station_line_connections[node_to_analyse.state[0]]:
+    for connection in STATION_LINE_CONNECTIONS[node_to_analyse.state[0]]:
 
         if connection[1] == node_to_analyse.state[1]:
-            real_distance = get_time_by_distance(pegar_planilha(real, node_to_analyse.state[0], connection[0]))
-            direct_distance = get_time_by_distance(pegar_planilha(direta, connection[0], dest[0]))
+            real_distance = get_time_by_distance(pegar_planilha(REAL, node_to_analyse.state[0], connection[0]))
+            direct_distance = get_time_by_distance(pegar_planilha(DIRETA, connection[0], dest[0]))
 
             real_cost = 0
             node_parent = node_to_analyse
@@ -92,14 +66,14 @@ def state_analysis(
 
         elif (node_to_analyse.state[0], connection[1]) not in [node.state for node in new_frontier]:
             real_distance = 0
-            direct_distance = get_time_by_distance(pegar_planilha(direta, node_to_analyse.state[0], dest[0]))
+            direct_distance = get_time_by_distance(pegar_planilha(DIRETA, node_to_analyse.state[0], dest[0]))
 
             real_cost = 0
             node_parent = node_to_analyse
             while node_parent:
                 real_cost += node_parent.real_cost
                 node_parent = node_parent.parent
-            total_cost = real_cost + direct_distance + real_distance + change_line_time
+            total_cost = real_cost + direct_distance + real_distance + CHANGE_LINE_TIME
             new_frontier.append(
                 Node(
                     state=(node_to_analyse.state[0], connection[1]), 
@@ -111,6 +85,7 @@ def state_analysis(
 
     new_frontier = new_frontier + latest_frontier[1:]
     new_frontier.sort(key=lambda x: x.cost)
+    print_frontier_nodes(latest_iteration + 1, new_frontier, nodes_that_were_first)
 
     first_node_not_analysed = None
     for node in new_frontier:
@@ -120,11 +95,10 @@ def state_analysis(
             break
 
     if first_node_not_analysed is not None and first_node_not_analysed.state == dest:
-        print_frontier_nodes(latest_iteration + 1, new_frontier, nodes_that_were_first)
+        print('==============================')
         print("Found!")
         return new_frontier
     
-    print_frontier_nodes(latest_iteration + 1, new_frontier, nodes_that_were_first)
     original_frontier[latest_iteration + 1] = new_frontier
     return state_analysis(
         start = start, 
@@ -136,12 +110,12 @@ def state_analysis(
 def a_star(start: tuple[int, str], dest: tuple[int, str]):
 
     for station, line in [start, dest]:
-        if station not in station_line_connections:
+        if station not in STATION_LINE_CONNECTIONS:
             raise ValueError(f"Station {station} does not exist")
         if line not in ["yellow", "blue", "red", "green"]:
             raise ValueError(f"Line {line} does not exist")
     
-    print(f'Fronteira 1: {[start]}')
+    print_frontier_nodes(1, [Node(state=start, parent=None, cost=0)])
     if start == dest:
         return [start]
     
@@ -153,20 +127,15 @@ def a_star(start: tuple[int, str], dest: tuple[int, str]):
                 Node(
                     state = start, 
                     parent = None, 
-                    cost = get_time_by_distance(pegar_planilha(direta, start[0], dest[0]))
+                    cost = get_time_by_distance(pegar_planilha(DIRETA, start[0], dest[0]))
                 )
             ],
         },
     )
 
-def number_not_in_bounds(number: int):
-    lower_bound = 1
-    upper_bound = 14
+def number_not_in_bounds(number: int): return number < LOWEST_STATION_NUMBER or number > HIGHEST_STATION_NUMBER
 
-    return number < lower_bound or number > upper_bound
-
-def line_not_in_bounds(line: str):
-    return line not in ["yellow", "blue", "red", "green"]
+def line_not_in_bounds(line: str): return line not in STATION_LINES
 
 def cli():
     
