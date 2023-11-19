@@ -1,5 +1,4 @@
 import pandas
-import time
 
 real_dist = pandas.read_csv("Distancias_Reais.csv", keep_default_na=False, index_col=0)
 direct_dist = pandas.read_csv("Distancias_Diretas.csv", keep_default_na=False, index_col=0)
@@ -49,16 +48,20 @@ def pegar_planilha(lista, E1, E2):
         
 def get_time_by_distance(distance: int): return distance / train_velocity * 60
 
-def print_frontier_nodes(index: int, frontier: list[Node]):
-    message = f'Fronteira {index}: '
+def print_frontier_nodes(index: int, frontier: list[Node], nodes_that_were_first: list[tuple[int, str]] = []):
+    message = f'Fronteira {index}:'
     for node in frontier:
-        message += f'{node.state}: {node.cost} '
+        if node.state not in nodes_that_were_first:
+            message += f'\n{node.state}: {node.cost}'
+    print('==============================')
     print(message)
+    print('==============================')
 
 def state_analysis(
     start: tuple[int, str], 
     dest: tuple[int, str], 
     original_frontier: dict[int, list[Node]], 
+    nodes_that_were_first: list[tuple[int, str]] = []
 ):
     latest_iteration = max(original_frontier.keys())
     latest_frontier = original_frontier[latest_iteration]
@@ -67,14 +70,10 @@ def state_analysis(
 
     new_frontier = []
     for connection in station_line_connections[node_to_analyse.state[0]]:
-        print(f'Analysing {connection}')
-
 
         if connection[1] == node_to_analyse.state[1]:
             real_distance = get_time_by_distance(pegar_planilha(real, node_to_analyse.state[0], connection[0]))
-            print(f'Pegando distancia real entre {node_to_analyse.state[0]} e {connection[0]}: {real_distance}')
             direct_distance = get_time_by_distance(pegar_planilha(direta, connection[0], dest[0]))
-            print(f'Pegando distancia direta entre {connection[0]} e {dest[0]}: {direct_distance}')
 
             real_cost = 0
             node_parent = node_to_analyse
@@ -90,12 +89,10 @@ def state_analysis(
                     real_cost=real_cost+direct_distance
                 )
             )
-            print(f'Added {connection} to frontier, with h = {direct_distance} + {real_distance} + {real_cost} = {total_cost}')
+
         elif (node_to_analyse.state[0], connection[1]) not in [node.state for node in new_frontier]:
             real_distance = 0
-            print(f'Pegando distancia real entre {node_to_analyse.state[0]} e {connection[0]}: {real_distance}')
             direct_distance = get_time_by_distance(pegar_planilha(direta, node_to_analyse.state[0], dest[0]))
-            print(f'Pegando distancia direta entre {node_to_analyse.state[0]} e {dest[0]}: {direct_distance}')
 
             real_cost = 0
             node_parent = node_to_analyse
@@ -111,24 +108,29 @@ def state_analysis(
                     real_cost=real_cost+direct_distance
                 )
             )
-            print(f'Added {(node_to_analyse.state[0], connection[1])} to frontier, with h = {direct_distance} + {real_distance} + {real_cost} + {change_line_time} = {total_cost}')
 
-    new_frontier = latest_frontier + new_frontier
+    new_frontier = new_frontier + latest_frontier[1:]
     new_frontier.sort(key=lambda x: x.cost)
 
-    if new_frontier[0].state == dest:
-        print_frontier_nodes(latest_iteration + 1, new_frontier)
+    first_node_not_analysed = None
+    for node in new_frontier:
+        if node.state not in nodes_that_were_first:
+            first_node_not_analysed = node
+            nodes_that_were_first.append(first_node_not_analysed.state)
+            break
+
+    if first_node_not_analysed is not None and first_node_not_analysed.state == dest:
+        print_frontier_nodes(latest_iteration + 1, new_frontier, nodes_that_were_first)
         print("Found!")
         return new_frontier
     
-    new_frontier = new_frontier[1:]
-    new_frontier.sort(key=lambda x: x.cost) 
-    print_frontier_nodes(latest_iteration + 1, new_frontier)
+    print_frontier_nodes(latest_iteration + 1, new_frontier, nodes_that_were_first)
     original_frontier[latest_iteration + 1] = new_frontier
     return state_analysis(
         start = start, 
         dest = dest, 
-        original_frontier = original_frontier
+        original_frontier = original_frontier,
+        nodes_that_were_first = nodes_that_were_first
     )
 
 def a_star(start: tuple[int, str], dest: tuple[int, str]):
@@ -157,24 +159,39 @@ def a_star(start: tuple[int, str], dest: tuple[int, str]):
         },
     )
 
+def number_not_in_bounds(number: int):
+    lower_bound = 1
+    upper_bound = 14
+
+    return number < lower_bound or number > upper_bound
+
+def line_not_in_bounds(line: str):
+    return line not in ["yellow", "blue", "red", "green"]
+
 def cli():
-    aaaaaa = int(input("\033[33mskip? (1/0)> \033[0m"))
-
-    if aaaaaa:
-        a_star(
-            start = (2, 'yellow'), 
-            dest = (13, 'red')
-        )
     
-    else:
-        start_number = int(input("Enter start station: "))
-        start_line = input("Enter start line (yellow, blue, red OR green): ")
-        dest_number = int(input("Enter destination station: "))
-        dest_line = input("Enter destination line (yellow, blue, red OR green): ")
+    start_number = int(input("Enter start station: "))
+    if number_not_in_bounds(start_number):
+        raise ValueError(f"Station {start_number} does not exist")
 
-        a_star(
-            start = (start_number, start_line), 
-            dest = (dest_number, dest_line)
-        )
+    start_line = input("Enter start line (yellow, blue, red OR green): ")
+    if line_not_in_bounds(start_line):
+        raise ValueError(f"Line {start_line} does not exist")
+    
+    dest_number = int(input("Enter destination station: "))
+    if number_not_in_bounds(dest_number):
+        raise ValueError(f"Station {dest_number} does not exist")
+    
+    dest_line = input("Enter destination line (yellow, blue, red OR green): ")
+    if line_not_in_bounds(dest_line):
+        raise ValueError(f"Line {dest_line} does not exist")
+
+    start_tuple = (start_number, start_line)
+    dest_tuple = (dest_number, dest_line)
+
+    a_star(
+        start = start_tuple,
+        dest = dest_tuple
+    )
 
 cli()
