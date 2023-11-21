@@ -3,11 +3,19 @@ from constraints import REAL, DIRETA, TRAIN_VELOCITY, CHANGE_LINE_TIME, LOWEST_S
 
 # Define the Node class
 class Node:
-    def __init__(self, state: tuple[int, str], parent: 'Node', cost: float, real_cost: float = 0):
+    def __init__(
+        self, 
+        state: tuple[int, str], 
+        p: int,
+        g: int = 0,
+        h: int = 0,
+        c: int = 0,
+    ):
         self.state = state
-        self.parent = parent
-        self.cost = cost
-        self.real_cost = real_cost
+        self.p = p
+        self.g = g
+        self.h = h
+        self.f = p + g + h + c
 
 # Function to retrieve distances from a spreadsheet
 def pegar_planilha(lista, E1, E2):
@@ -27,141 +35,111 @@ def pegar_planilha(lista, E1, E2):
             return -1
 
 # Function to calculate time based on distance
-def get_time_by_distance(distance: float): return distance / TRAIN_VELOCITY * 60
+def get_time_by_distance(distance: float): return (distance / TRAIN_VELOCITY) * 60
+
+def time_between(lista: str, E1: int, E2: int): return get_time_by_distance(pegar_planilha(lista, E1, E2))
 
 # Function to print the nodes in the frontier
-def print_frontier_nodes(index: int, frontier: list[Node], nodes_that_were_first: list[tuple[tuple[int, str], float]] = []):
+def print_frontier_nodes(index: int, frontier: list[Node]):
     message = f'Fronteira {index}:'
     for node in frontier:
-        if (node.state, node.cost) not in nodes_that_were_first:
-            message += f'\n{node.state}: {node.cost}'
+        message += f'\n{node.state}: {node.f}'
     print('==============================')
     print(message)
 
-def print_solution(node: Node):
-    solution = f'{node.state}'
-    node_parent = node.parent
-    while node_parent:
-        solution = f'{node_parent.state} -> {solution}'
-        node_parent = node_parent.parent
-    return solution
+def print_solution(visited_states: list[tuple[int, str]]):
+    message = ''
+    past_state = None
+    for state in visited_states:
+        if past_state is not None:
+            if state[1] != past_state[1]: message += f'{(past_state[0], state[1])} -> '
+        message += f'{state} -> '
+        past_state = state
+    return message[:-4]
 
 # Function to analyze the state and generate new frontier nodes
 def state_analysis(
-    start: tuple[int, str], 
     dest: tuple[int, str], 
-    original_frontier: dict[int, list[Node]], 
-    nodes_that_were_first: list[tuple[tuple[int, str], float]] = []
+    frontier: dict[int, list[Node]], 
+    visited_states: list[tuple[int, str]] = []
 ):
-    # Get the latest frontier and node to analyze
-    latest_iteration = max(original_frontier.keys())
-    latest_frontier = original_frontier[latest_iteration]
-    node_to_analyse = latest_frontier[0]
-
-    # Generate new frontier nodes based on line connections
     new_frontier: list[Node] = []
-    for connection in STATION_LINE_CONNECTIONS[node_to_analyse.state[0]]:
 
-        # If the line of the connection is the same as the line of the node to analyze
-        if connection[1] == node_to_analyse.state[1]:
-            # Calculate real and direct distances
-            real_distance = get_time_by_distance(pegar_planilha(REAL, node_to_analyse.state[0], connection[0]))
-            direct_distance = get_time_by_distance(pegar_planilha(DIRETA, connection[0], dest[0]))
+    # Get the latest frontier and node to analyze
+    latest_iteration = max(frontier.keys())
+    latest_frontier = frontier[latest_iteration]
+    node_to_be_compared = latest_frontier[0]
 
-            # Calculate real cost by summing the real costs of parent nodes
-            real_cost = 0
-            node_parent = node_to_analyse
-            while node_parent:
-                real_cost += node_parent.real_cost
-                node_parent = node_parent.parent
+    for connection in STATION_LINE_CONNECTIONS[node_to_be_compared.state[0]]:
 
-            # Calculate total cost and create new node
-            total_cost = real_cost + direct_distance + real_distance
+        if connection not in visited_states:
+            p = node_to_be_compared.p + node_to_be_compared.g
+            g = time_between(REAL, node_to_be_compared.state[0], connection[0])
+            h = time_between(DIRETA, connection[0], dest[0])
+
+            c = 0
+            if connection[1] != node_to_be_compared.state[1]: c = CHANGE_LINE_TIME
+
             new_frontier.append(
                 Node(
-                    state=connection, 
-                    parent=node_to_analyse, 
-                    cost=total_cost,
-                    real_cost=real_cost+direct_distance
+                    state = connection,
+                    p = p,
+                    g = g,
+                    h = h,
+                    c = c,
                 )
             )
-        
-        # Else, we insert a node that represent the change of line, but staying in the same station
-        elif (node_to_analyse.state[0], connection[1]) not in [node.state for node in new_frontier]:
-            # Calculate direct distance and total cost for changing lines
-            real_distance = 0
-            direct_distance = get_time_by_distance(pegar_planilha(DIRETA, node_to_analyse.state[0], dest[0]))
-
-            # Calculate real cost by summing the real costs of parent nodes
-            real_cost = 0
-            node_parent = node_to_analyse
-            while node_parent:
-                real_cost += node_parent.real_cost
-                node_parent = node_parent.parent
-
-            # Calculate total cost and create new node
-            total_cost = real_cost + direct_distance + real_distance + CHANGE_LINE_TIME
-            new_frontier.append(
-                Node(
-                    state=(node_to_analyse.state[0], connection[1]), 
-                    parent=node_to_analyse, 
-                    cost=total_cost,
-                    real_cost=real_cost+direct_distance
-                )
-            )
-
-    # Sort the new frontier based on cost and print the nodes
-    new_frontier = new_frontier + latest_frontier[1:]
-    new_frontier.sort(key=lambda x: x.cost)
-    print_frontier_nodes(latest_iteration + 1, new_frontier, nodes_that_were_first)
-
-    # Find the first node in the new frontier that has not been analyzed
-    first_node_not_analysed = None
-    for node in new_frontier:
-        if (node.state, node.cost) not in nodes_that_were_first:
-            first_node_not_analysed = node
-            nodes_that_were_first.append((first_node_not_analysed.state, first_node_not_analysed.cost))
-            break
-
-    # If the first unanalyzed node is the destination, print "Found!"
-    if first_node_not_analysed is not None and first_node_not_analysed.state == dest:
-        print('==============================')
-        print("Found!")
-        print(f'Solução: {print_solution(first_node_not_analysed)}')
-        print(f'Custo: {first_node_not_analysed.cost} minutes')
-        return new_frontier
     
-    # Add the new frontier to the original frontier and recursively call state_analysis
-    original_frontier[latest_iteration + 1] = new_frontier
-    return state_analysis(
-        start = start, 
-        dest = dest, 
-        original_frontier = original_frontier,
-        nodes_that_were_first = nodes_that_were_first
+    # Sort the new frontier by the f value
+    new_frontier.sort(key=lambda node: node.f)
+
+    # Add the new frontier to the dictionary
+    frontier[latest_iteration + 1] = new_frontier
+
+    # Print the new frontier
+    print_frontier_nodes(latest_iteration + 1, new_frontier)
+
+    # Add the new frontier to the visited states
+    visited_states.append(new_frontier[0].state)
+
+    # Check if the destination has been reached
+    if new_frontier[0].state[0] == dest[0]:
+        print('==============================')
+        print('⭐ Found solution!')
+        print(f'🚆 Solution: {print_solution(visited_states)}')
+        print(f'🕐 Cost: {new_frontier[0].f} minutes')
+        return
+    
+    # Call the state analysis function again
+    state_analysis(
+        dest = dest,
+        frontier = frontier,
+        visited_states = visited_states
     )
 
 # A* search algorithm
 def a_star(start: tuple[int, str], dest: tuple[int, str]):
     
     # Print the initial frontier nodes
-    print_frontier_nodes(1, [Node(state=start, parent=None, cost=0)])
+    print_frontier_nodes(1, [Node(state=start, p=0, g=0, h=time_between(DIRETA, start[0], dest[0]))])
 
     # If start and destination are the same, return the start node
     if start == dest: return [start]
     
     # Perform state analysis to find the path
     state_analysis(
-        start = start, 
         dest = dest,
-        original_frontier = {
+        frontier = {
             1: [
                 Node(
                     state = start, 
-                    parent = None, 
-                    cost = get_time_by_distance(pegar_planilha(DIRETA, start[0], dest[0]))
+                    p = 0,
+                    g = 0,
+                    h = time_between(DIRETA, start[0], dest[0])
                 )
             ],
         },
+        visited_states = [start]
     )
 
 # Function to check if a number is within the station number bounds
