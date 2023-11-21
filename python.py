@@ -37,6 +37,7 @@ def pegar_planilha(lista, E1, E2):
 # Function to calculate time based on distance
 def get_time_by_distance(distance: float): return (distance / TRAIN_VELOCITY) * 60
 
+# Function to calculate time between two stations
 def time_between(lista: str, E1: int, E2: int): return get_time_by_distance(pegar_planilha(lista, E1, E2))
 
 # Function to print the nodes in the frontier
@@ -78,14 +79,17 @@ def state_analysis(
 
     for connection in STATION_LINE_CONNECTIONS[node_to_be_compared.state[0]]:
 
+        # Check if the connection has already been visited
         if connection not in visited_states:
-            p = node_to_be_compared.p + node_to_be_compared.g
-            g = time_between(REAL, node_to_be_compared.state[0], connection[0])
-            h = time_between(DIRETA, connection[0], dest[0])
+            p = node_to_be_compared.p + node_to_be_compared.g # p represents the cost of the path until the current connection
+            g = time_between(REAL, node_to_be_compared.state[0], connection[0]) # g represents the cost of the path from the state being analyzed to the current connection
+            h = time_between(DIRETA, connection[0], dest[0]) # h represents the straight-line cost of the path from the current connection to the destination
 
+            # evaluating if there'll be a line change
             c = 0
             if connection[1] != node_to_be_compared.state[1]: c = CHANGE_LINE_TIME
 
+            # Add the new node to the new frontier
             new_frontier.append(
                 Node(
                     state = connection,
@@ -155,24 +159,37 @@ def number_not_in_bounds(number: int): return number < LOWEST_STATION_NUMBER or 
 # Function to check if a line is within the valid lines
 def line_not_in_bounds(line: str): return line not in STATION_LINES
 
+# Function to check if a line is not in a station
+def line_not_in_station(line: str, station: int): return line not in AVAILABLE_LINES[station]
+
 # Command-line interface function
 def cli():
     # Get input from the user and validate it
     start_number = int(input("🔜 Enter start station: "))
     if number_not_in_bounds(start_number):
-        raise ValueError(f"Station {start_number} does not exist")
+        print(f"⛔ Station {start_number} does not exist")
+        exit()
 
     start_line = input("🔜 Enter start line (yellow, blue, red OR green): ")
     if line_not_in_bounds(start_line):
-        raise ValueError(f"Line {start_line} does not exist")
+        print(f"⛔ Line {start_line} does not exist")
+        exit()
+    if line_not_in_station(start_line, start_number):
+        print(f"⛔ Line {start_line} does not pass through station {start_number}")
+        exit()
     
     dest_number = int(input("🔚 Enter destination station: "))
     if number_not_in_bounds(dest_number):
-        raise ValueError(f"Station {dest_number} does not exist")
+        print(f"⛔ Station {dest_number} does not exist")
+        exit()
     
     dest_line = input("🔚 Enter destination line (yellow, blue, red OR green): ")
     if line_not_in_bounds(dest_line):
-        raise ValueError(f"Line {dest_line} does not exist")
+        print(f"⛔ Line {dest_line} does not exist")
+        exit()
+    if line_not_in_station(dest_line, dest_number):
+        print(f"⛔ Line {dest_line} does not pass through station {dest_number}")
+        exit()
 
     # Convert input to tuples
     start_tuple = (start_number, start_line)
