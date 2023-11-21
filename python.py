@@ -1,5 +1,5 @@
 # Import necessary modules and classes
-from constraints import REAL, DIRETA, TRAIN_VELOCITY, CHANGE_LINE_TIME, LOWEST_STATION_NUMBER, HIGHEST_STATION_NUMBER, STATION_LINES, REAL_DISTANCES_CSV, DIRECT_DISTANCES_CSV, STATION_LINE_CONNECTIONS
+from constraints import REAL, DIRETA, TRAIN_VELOCITY, CHANGE_LINE_TIME, LOWEST_STATION_NUMBER, HIGHEST_STATION_NUMBER, STATION_LINES, REAL_DISTANCES_CSV, DIRECT_DISTANCES_CSV, STATION_LINE_CONNECTIONS, AVAILABLE_LINES
 
 # Define the Node class
 class Node:
@@ -47,15 +47,21 @@ def print_frontier_nodes(index: int, frontier: list[Node]):
     print('==============================')
     print(message)
 
-def print_solution(visited_states: list[tuple[int, str]]):
+def print_solution(visited_states: list[tuple[int, str]], dest: tuple[int, str]):
     message = ''
+
     past_state = None
     for state in visited_states:
         if past_state is not None:
             if state[1] != past_state[1]: message += f'{(past_state[0], state[1])} -> '
         message += f'{state} -> '
         past_state = state
-    return message[:-4]
+    
+    cost = 0
+    if visited_states[-1][1] != dest[1] and dest[1] in AVAILABLE_LINES[visited_states[-1][0]]: 
+        message += f'{(dest[0], dest[1])} -> '
+        cost += CHANGE_LINE_TIME
+    return message[:-4], cost
 
 # Function to analyze the state and generate new frontier nodes
 def state_analysis(
@@ -104,10 +110,11 @@ def state_analysis(
 
     # Check if the destination has been reached
     if new_frontier[0].state[0] == dest[0]:
+        message_solution, extra_cost = print_solution(visited_states, dest)
         print('==============================')
         print('⭐ Found solution!')
-        print(f'🚆 Solution: {print_solution(visited_states)}')
-        print(f'🕐 Cost: {new_frontier[0].f} minutes')
+        print(f'🚆 Solution: {message_solution}')
+        print(f'🕐 Cost: {new_frontier[0].f + extra_cost} minutes')
         return
     
     # Call the state analysis function again

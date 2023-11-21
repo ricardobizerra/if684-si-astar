@@ -30,3 +30,8 @@ STATION_LINE_CONNECTIONS: dict[int, list[tuple[int, str]]] = {
     13: [(3, 'red'), (4, 'green'), (14, 'green')],
     14: [(13, 'green')]
 }
+
+AVAILABLE_LINES: dict[int, list[str]] = {}
+for station, connections in STATION_LINE_CONNECTIONS.items():
+    lines = [line for _, line in connections]
+    AVAILABLE_LINES[station] = lines
