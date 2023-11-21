@@ -70,6 +70,7 @@ def state_analysis(
     frontier: dict[int, list[Node]], 
     visited_states: list[tuple[int, str]] = []
 ):
+    # Create a new frontier
     new_frontier: list[Node] = []
 
     # Get the latest frontier and node to analyze
@@ -112,7 +113,7 @@ def state_analysis(
     # Add the new frontier to the visited states
     visited_states.append(new_frontier[0].state)
 
-    # Check if the destination has been reached
+    # Check if the destination station has been reached
     if new_frontier[0].state[0] == dest[0]:
         message_solution, extra_cost = print_solution(visited_states, dest)
         print('==============================')
@@ -121,7 +122,7 @@ def state_analysis(
         print(f'🕐 Cost: {new_frontier[0].f + extra_cost} minutes')
         return
     
-    # Call the state analysis function again
+    # Call the state analysis function recursively
     state_analysis(
         dest = dest,
         frontier = frontier,
@@ -130,25 +131,31 @@ def state_analysis(
 
 # A* search algorithm
 def a_star(start: tuple[int, str], dest: tuple[int, str]):
-    
-    # Print the initial frontier nodes
-    print_frontier_nodes(1, [Node(state=start, p=0, g=0, h=time_between(DIRETA, start[0], dest[0]))])
+    # Create the start node
+    start_node = Node(
+        state = start,
+        p = 0,
+        g = 0,
+        h = time_between(DIRETA, start[0], dest[0])
+    )
 
-    # If start and destination are the same, return the start node
-    if start == dest: return [start]
+    # Print the initial frontier nodes
+    print_frontier_nodes(1, [start_node])
+
+    # If start and destination stations are the same, return the start node
+    if start[0] == dest[0]:
+        message_solution, extra_cost = print_solution([start], dest)
+        print('==============================')
+        print('⭐ Found solution!')
+        print(f'🚆 Solution: {message_solution}')
+        print(f'🕐 Cost: {start_node.f + extra_cost} minutes')
+        return
     
     # Perform state analysis to find the path
     state_analysis(
         dest = dest,
         frontier = {
-            1: [
-                Node(
-                    state = start, 
-                    p = 0,
-                    g = 0,
-                    h = time_between(DIRETA, start[0], dest[0])
-                )
-            ],
+            1: [start_node],
         },
         visited_states = [start]
     )
