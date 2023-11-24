@@ -10,12 +10,14 @@ class Node:
         g: int = 0,
         h: int = 0,
         c: int = 0,
+        parent_state: tuple[int, str] = None,
     ):
         self.state = state
         self.p = p
         self.g = g
         self.h = h
         self.f = p + g + h + c
+        self.parent_state = parent_state
 
 # Function to retrieve distances from a spreadsheet
 def pegar_planilha(lista, E1, E2):
@@ -48,27 +50,40 @@ def print_frontier_nodes(index: int, frontier: list[Node]):
     print('==============================')
     print(message)
 
-def print_solution(visited_states: list[tuple[int, str]], dest: tuple[int, str]):
+def print_solution(visited_states: list[Node], dest: tuple[int, str]):
     message = ''
 
+    # Get the first parent state
+    parent_state = visited_states[-1].parent_state
+    path: list[tuple[int, str]] = [visited_states[-1].state]    
+
+    # Get the path elements
+    while parent_state is not None:
+        path.append(parent_state)
+        parent_state = [node for node in visited_states if node.state == parent_state][0].parent_state # Get the parent state of the current parent state
+
+    # Reverse the path in order to print it
+    path.reverse()
     past_state = None
-    for state in visited_states:
+    for state in path:
         if past_state is not None:
             if state[1] != past_state[1]: message += f'{(past_state[0], state[1])} -> '
         message += f'{state} -> '
         past_state = state
-    
+
+    # Check if there'll be a line change and add the extra cost
     cost = 0
-    if visited_states[-1][1] != dest[1] and dest[1] in AVAILABLE_LINES[visited_states[-1][0]]: 
+    if path[-1][1] != dest[1] and dest[1] in AVAILABLE_LINES[path[-1][0]]: 
         message += f'{(dest[0], dest[1])} -> '
         cost += CHANGE_LINE_TIME
+
     return message[:-4], cost
 
 # Function to analyze the state and generate new frontier nodes
 def state_analysis(
     dest: tuple[int, str], 
     frontier: dict[int, list[Node]], 
-    visited_states: list[tuple[int, str]] = []
+    visited_states: list[Node] = []
 ):
     # Create a new frontier
     new_frontier: list[Node] = []
@@ -81,7 +96,7 @@ def state_analysis(
     for connection in STATION_LINE_CONNECTIONS[node_to_be_compared.state[0]]:
 
         # Check if the connection has already been visited
-        if connection not in visited_states:
+        if connection not in [node.state for node in visited_states]:
             p = node_to_be_compared.p + node_to_be_compared.g # p represents the cost of the path until the current connection
             g = time_between(REAL, node_to_be_compared.state[0], connection[0]) # g represents the cost of the path from the state being analyzed to the current connection
             h = time_between(DIRETA, connection[0], dest[0]) # h represents the straight-line cost of the path from the current connection to the destination
@@ -94,6 +109,7 @@ def state_analysis(
             new_frontier.append(
                 Node(
                     state = connection,
+                    parent_state = node_to_be_compared.state,
                     p = p,
                     g = g,
                     h = h,
@@ -113,7 +129,7 @@ def state_analysis(
     print_frontier_nodes(latest_iteration + 1, new_frontier)
 
     # Add the new frontier to the visited states
-    visited_states.append(new_frontier[0].state)
+    visited_states.append(new_frontier[0])
 
     # Check if the destination station has been reached
     if new_frontier[0].state[0] == dest[0]:
@@ -159,7 +175,7 @@ def a_star(start: tuple[int, str], dest: tuple[int, str]):
         frontier = {
             1: [start_node],
         },
-        visited_states = [start]
+        visited_states = [start_node]
     )
 
 # Function to check if a number is within the station number bounds
