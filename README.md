@@ -22,3 +22,9 @@ This project implements the A* algorithm to find the shortest path between two s
 - Frontiers for each iteration of the A* algorithm
 - Solution path
 - Solution cost _(total time in minutes)_
+
+## Authors
+
+- [Mário Borba (mbl)](https://github.com/mbl-cin)
+- [Rafael Rios (rrcv2)](https://github.com/RafaelRaios)
+- [Ricardo Bizerra (rblf)](https://github.com/ricardobizerra)
