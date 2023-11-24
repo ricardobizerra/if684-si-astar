@@ -44,7 +44,7 @@ def time_between(lista: str, E1: int, E2: int): return get_time_by_distance(pega
 def print_frontier_nodes(index: int, frontier: list[Node]):
     message = f'Fronteira {index}:'
     for node in frontier:
-        message += f'\n{node.state}: {node.f}'
+        message += f'\n{node.state}: {round(node.f, 2)}'
     print('==============================')
     print(message)
 
@@ -100,6 +100,8 @@ def state_analysis(
                     c = c,
                 )
             )
+
+    new_frontier = new_frontier + latest_frontier[1:]
     
     # Sort the new frontier by the f value
     new_frontier.sort(key=lambda node: node.f)
@@ -119,7 +121,7 @@ def state_analysis(
         print('==============================')
         print('⭐ Found solution!')
         print(f'🚆 Solution: {message_solution}')
-        print(f'🕐 Cost: {new_frontier[0].f + extra_cost} minutes')
+        print(f'🕐 Cost: {round(new_frontier[0].f + extra_cost, 2)} minutes')
         return
     
     # Call the state analysis function recursively
